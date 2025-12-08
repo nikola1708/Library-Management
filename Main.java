@@ -1,7 +1,14 @@
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class Main extends JFrame {
     // Instance logic utama
@@ -264,8 +271,44 @@ public class Main extends JFrame {
         tableMember = new JTable(modelMember);
         tabAdminData.add("Daftar Member", new JScrollPane(tableMember));
 
+        // --- Tambahkan tombol Export CSV di atas tabAdminData ---
+        JPanel rightWrapper = new JPanel(new BorderLayout());
+        JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JButton btnExportLog = new JButton("Export Log ke CSV");
+        toolbar.add(btnExportLog);
+        rightWrapper.add(toolbar, BorderLayout.NORTH);
+        rightWrapper.add(tabAdminData, BorderLayout.CENTER);
+
+        // Logic Export CSV
+        btnExportLog.addActionListener(e -> {
+            Object[][] logs = lib.getLogData();
+
+            JFileChooser chooser = new JFileChooser();
+            chooser.setSelectedFile(new File("log_aktivitas.csv"));
+            int ret = chooser.showSaveDialog(this);
+            if (ret != JFileChooser.APPROVE_OPTION) return;
+
+            File file = chooser.getSelectedFile();
+            try (PrintWriter pw = new PrintWriter(new OutputStreamWriter(new FileOutputStream(file), StandardCharsets.UTF_8))) {
+                // Header CSV
+                pw.println("Waktu,Aksi,Member,Info");
+
+                for (Object[] row : logs) {
+                    String line = Arrays.stream(row)
+                            .map(o -> o == null ? "" : escapeCsv(o.toString()))
+                            .collect(Collectors.joining(","));
+                    pw.println(line);
+                }
+
+                JOptionPane.showMessageDialog(this, "Export berhasil: " + file.getAbsolutePath());
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                JOptionPane.showMessageDialog(this, "Gagal export: " + ex.getMessage());
+            }
+        });
+
         splitAdmin.setLeftComponent(wrapperForm);
-        splitAdmin.setRightComponent(tabAdminData);
+        splitAdmin.setRightComponent(rightWrapper);
         splitAdmin.setDividerLocation(350); // Lebar panel kiri
 
         // ============================================================
@@ -348,6 +391,15 @@ public class Main extends JFrame {
         modelMember.setRowCount(0);
         Object[][] mems = lib.getMemberData(); // Method baru di Perpustakaan.java
         for (Object[] row : mems) modelMember.addRow(row);
+    }
+
+    // Utility untuk escape CSV sederhana (menggandakan quotes dan membungkus jika perlu)
+    private static String escapeCsv(String field) {
+        if (field.contains(",") || field.contains("\"") || field.contains("\n") || field.contains("\r")) {
+            String escaped = field.replace("\"", "\"\"");
+            return "\"" + escaped + "\"";
+        }
+        return field;
     }
 
     public static void main(String[] args) {
