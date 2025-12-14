@@ -138,27 +138,51 @@ public class Perpustakaan {
        BAGIAN 3: MANAJEMEN MEMBER
        ========================================================== */
 
-    public Member daftarAnggota(String nama, int batasPinjam) {
-        Member existing = getAnggota(nama);
-        if (existing != null) return existing; // Jika sudah ada, kembalikan yang lama
+    // Registrasi member dengan validasi email & no telepon untuk menghindari duplikasi nama
+    public Member daftarAnggota(String nama, String email, String noTelepon, int batasPinjam) {
+        // Validasi input tidak kosong
+        if (nama.trim().isEmpty() || email.trim().isEmpty() || noTelepon.trim().isEmpty()) {
+            return null; // Return null jika ada field kosong
+        }
 
-        String sql = "INSERT INTO member (nama, batas_pinjam) VALUES (?, ?)";
+        // Cek apakah email sudah terdaftar (identitas unik)
+        if (cekEmailSudahAda(email)) {
+            return null; // Email sudah terdaftar
+        }
+
+        // Jika nama sama, gunakan email/telepon untuk membedakan
+        Member existing = getAnggotaByNama(nama);
+        if (existing != null && existing.getEmail().equals(email)) {
+            return existing; // Nama dan email sama, return member yang ada
+        }
+
+        String sql = "INSERT INTO member (nama, email, no_telepon, batas_pinjam) VALUES (?, ?, ?, ?)";
         try (Connection conn = Database.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setString(1, nama);
-            stmt.setInt(2, batasPinjam);
+            stmt.setString(2, email);
+            stmt.setString(3, noTelepon);
+            stmt.setInt(4, batasPinjam);
             stmt.executeUpdate();
 
-            return getAnggota(nama); // Ambil ulang dari DB agar ID-nya terbawa
+            // LOG: Catat registrasi member baru
+            catatLog("REGISTRASI_MEMBER", "-", nama, "Member baru terdaftar: " + email);
+
+            return getAnggotaByEmail(email); // Ambil ulang dari DB agar semua field terbawa
         } catch (SQLException e) {
             e.printStackTrace();
         }
         return null;
     }
 
+    // Overload method untuk backward compatibility (tanpa email/telepon)
+    public Member daftarAnggota(String nama, int batasPinjam) {
+        return daftarAnggota(nama, nama + "@perpus.local", "0000000000", batasPinjam);
+    }
+
     public Member getAnggota(String nama) {
-        String sql = "SELECT * FROM member WHERE LOWER(nama) = ?";
+        String sql = "SELECT * FROM member WHERE LOWER(nama) = ? LIMIT 1";
 
         try (Connection conn = Database.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -169,6 +193,8 @@ public class Perpustakaan {
             if (rs.next()) {
                 Member m = new Member(rs.getString("nama"), rs.getInt("batas_pinjam"));
                 m.setId(rs.getInt("id"));
+                m.setEmail(rs.getString("email"));
+                m.setNoTelepon(rs.getString("no_telepon"));
                 // Penting: Load juga buku yang sedang dipinjam member ini dari DB
                 m.setDaftarDipinjam(getBukuDipinjam(nama));
                 return m;
@@ -177,6 +203,49 @@ public class Perpustakaan {
             e.printStackTrace();
         }
         return null;
+    }
+
+    // Method baru: Cari member berdasarkan nama (bisa ada duplikat, return yang pertama)
+    public Member getAnggotaByNama(String nama) {
+        return getAnggota(nama);
+    }
+
+    // Method baru: Cari member berdasarkan email (UNIK)
+    public Member getAnggotaByEmail(String email) {
+        String sql = "SELECT * FROM member WHERE email = ?";
+
+        try (Connection conn = Database.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, email);
+            ResultSet rs = stmt.executeQuery();
+
+            if (rs.next()) {
+                Member m = new Member(rs.getString("nama"), rs.getInt("batas_pinjam"));
+                m.setId(rs.getInt("id"));
+                m.setEmail(rs.getString("email"));
+                m.setNoTelepon(rs.getString("no_telepon"));
+                m.setDaftarDipinjam(getBukuDipinjam(rs.getString("nama")));
+                return m;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    // Method baru: Cek apakah email sudah terdaftar
+    private boolean cekEmailSudahAda(String email) {
+        String sql = "SELECT COUNT(*) FROM member WHERE email = ?";
+        try (Connection conn = Database.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, email);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) return rs.getInt(1) > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
     public void tampilkanSemuaAnggota() {
