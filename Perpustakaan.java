@@ -58,6 +58,9 @@ public class Perpustakaan {
 
     // Menambah Buku Baru + Catat Log
     public void tambahBuku(Buku b) {
+        if (bukuSudahAda(b.getJudul(), b.getPengarang())) {
+            return; // atau throw exception / popup
+        }
         String jenis = (b instanceof BukuFiksi) ? "Fiksi" : "NonFiksi";
         String sql = "INSERT INTO buku (judul, pengarang, jenis, info_khusus) VALUES (?, ?, ?, ?)";
 
@@ -76,6 +79,17 @@ public class Perpustakaan {
         } catch (SQLException e) {
             e.printStackTrace();
         }
+    }
+    private boolean bukuSudahAda(String judul, String pengarang) {
+        String sql = "SELECT COUNT(*) FROM buku WHERE LOWER(judul)=? AND LOWER(pengarang)=?";
+        try (Connection conn = Database.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, judul.toLowerCase());
+            stmt.setString(2, pengarang.toLowerCase());
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) return rs.getInt(1) > 0;
+        } catch (SQLException e) { e.printStackTrace(); }
+        return false;
     }
 
     public List<Buku> getSemuaBuku() {
@@ -178,8 +192,30 @@ public class Perpustakaan {
 
     // Overload method untuk backward compatibility (tanpa email/telepon)
     public Member daftarAnggota(String nama, int batasPinjam) {
-        return daftarAnggota(nama, nama + "@perpus.local", "0000000000", batasPinjam);
+        String sql = "INSERT INTO member (nama, batas_pinjam) VALUES (?, ?)";
+
+        try (Connection conn = Database.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+
+            stmt.setString(1, nama);
+            stmt.setInt(2, batasPinjam);
+            stmt.executeUpdate();
+
+            ResultSet rs = stmt.getGeneratedKeys();
+            if (rs.next()) {
+                Member m = new Member(nama, batasPinjam);
+                m.setId(rs.getInt(1));
+                return m;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
+
+    // Overload method untuk backward compatibility (tanpa email/telepon)
+
+
 
     public Member getAnggota(String nama) {
         String sql = "SELECT * FROM member WHERE LOWER(nama) = ? LIMIT 1";
@@ -191,11 +227,13 @@ public class Perpustakaan {
             ResultSet rs = stmt.executeQuery();
 
             if (rs.next()) {
-                Member m = new Member(rs.getString("nama"), rs.getInt("batas_pinjam"));
+                Member m = new Member(
+                        rs.getString("nama"),
+                        rs.getString("email"),
+                        rs.getString("no_telepon"),
+                        rs.getInt("batas_pinjam")
+                );
                 m.setId(rs.getInt("id"));
-                m.setEmail(rs.getString("email"));
-                m.setNoTelepon(rs.getString("no_telepon"));
-                // Penting: Load juga buku yang sedang dipinjam member ini dari DB
                 m.setDaftarDipinjam(getBukuDipinjam(nama));
                 return m;
             }
@@ -204,6 +242,8 @@ public class Perpustakaan {
         }
         return null;
     }
+
+
 
     // Method baru: Cari member berdasarkan nama (bisa ada duplikat, return yang pertama)
     public Member getAnggotaByNama(String nama) {
@@ -221,10 +261,13 @@ public class Perpustakaan {
             ResultSet rs = stmt.executeQuery();
 
             if (rs.next()) {
-                Member m = new Member(rs.getString("nama"), rs.getInt("batas_pinjam"));
+                Member m = new Member(
+                        rs.getString("nama"),
+                        rs.getString("email"),
+                        rs.getString("no_telepon"),
+                        rs.getInt("batas_pinjam")
+                );
                 m.setId(rs.getInt("id"));
-                m.setEmail(rs.getString("email"));
-                m.setNoTelepon(rs.getString("no_telepon"));
                 m.setDaftarDipinjam(getBukuDipinjam(rs.getString("nama")));
                 return m;
             }
@@ -233,6 +276,7 @@ public class Perpustakaan {
         }
         return null;
     }
+
 
     // Method baru: Cek apakah email sudah terdaftar
     private boolean cekEmailSudahAda(String email) {

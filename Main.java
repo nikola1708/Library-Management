@@ -408,6 +408,7 @@ public class Main extends JFrame {
                     "Registrasi berhasil!\nID Member: " + newMember.getId() + 
                     "\nSelamat datang, " + newMember.getNama() + "!");
                 result[0] = newMember;
+                refreshAdminTables();
                 dlgRegistrasi.dispose();
             } else {
                 JOptionPane.showMessageDialog(dlgRegistrasi, 
@@ -503,7 +504,7 @@ public class Main extends JFrame {
 
     public static void main(String[] args) {
         // Menggunakan Thread Swing agar GUI Aman
-        seedData();
+
         SwingUtilities.invokeLater(() -> new Main().setVisible(true));
     }
     private static void seedData() {
