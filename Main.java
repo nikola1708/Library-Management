@@ -131,14 +131,20 @@ public class Main extends JFrame {
                         "Member Baru", JOptionPane.YES_NO_OPTION);
 
                 if (confirm == JOptionPane.YES_OPTION) {
-                    currentMember = lib.daftarAnggota(nama, 3); // Default batas 3
+                    // Buka form registrasi lengkap
+                    Member newMember = bukaFormRegistrasi(nama);
+                    if (newMember != null) {
+                        currentMember = newMember;
+                    } else {
+                        return;
+                    }
                 } else {
                     return;
                 }
             }
 
             // Update UI setelah login sukses
-            lblStatusMember.setText("Login: " + currentMember.getNama() + " (Kuota Pinjam: " + currentMember.getBatasPinjam() + ")");
+            lblStatusMember.setText("Login: " + currentMember.getNama() + " (" + currentMember.getEmail() + ") | Kuota: " + currentMember.getBatasPinjam());
             lblStatusMember.setForeground(new Color(0, 128, 0)); // Hijau
             btnPinjam.setEnabled(true);
             btnKembali.setEnabled(true);
@@ -322,6 +328,99 @@ public class Main extends JFrame {
 
         // Load data awal saat aplikasi dibuka
         refreshAllData();
+    }
+
+    // ============================================================
+    // FORM REGISTRASI MEMBER DIALOG
+    // ============================================================
+    
+    private Member bukaFormRegistrasi(String namaDefault) {
+        // Buat Dialog dengan form registrasi
+        JDialog dlgRegistrasi = new JDialog(this, "Form Registrasi Member Baru", true);
+        dlgRegistrasi.setSize(450, 350);
+        dlgRegistrasi.setLocationRelativeTo(this);
+        dlgRegistrasi.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+
+        JPanel pnlForm = new JPanel(new GridLayout(5, 2, 10, 10));
+        pnlForm.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+
+        // Field Input
+        JTextField txtNama = new JTextField(namaDefault);
+        JTextField txtEmail = new JTextField();
+        JTextField txtNoTelepon = new JTextField();
+        JSpinner spnBatas = new JSpinner(new SpinnerNumberModel(3, 1, 10, 1));
+
+        // Label
+        pnlForm.add(new JLabel("Nama Lengkap:"));
+        pnlForm.add(txtNama);
+        pnlForm.add(new JLabel("Email:"));
+        pnlForm.add(txtEmail);
+        pnlForm.add(new JLabel("No. Telepon:"));
+        pnlForm.add(txtNoTelepon);
+        pnlForm.add(new JLabel("Batas Pinjam (buku):"));
+        pnlForm.add(spnBatas);
+
+        // Tombol
+        JButton btnDaftar = new JButton("DAFTAR");
+        JButton btnBatal = new JButton("BATAL");
+
+        JPanel pnlButton = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
+        pnlButton.add(btnDaftar);
+        pnlButton.add(btnBatal);
+
+        dlgRegistrasi.add(pnlForm, BorderLayout.CENTER);
+        dlgRegistrasi.add(pnlButton, BorderLayout.SOUTH);
+
+        // Holder untuk member yang didaftar
+        Member[] result = new Member[1];
+        result[0] = null;
+
+        // Logic Daftar
+        btnDaftar.addActionListener(e -> {
+            String nama = txtNama.getText().trim();
+            String email = txtEmail.getText().trim();
+            String noTelepon = txtNoTelepon.getText().trim();
+            int batas = (Integer) spnBatas.getValue();
+
+            // Validasi
+            if (nama.isEmpty() || email.isEmpty() || noTelepon.isEmpty()) {
+                JOptionPane.showMessageDialog(dlgRegistrasi, "Semua field harus diisi!");
+                return;
+            }
+
+            // Validasi email format sederhana
+            if (!email.contains("@")) {
+                JOptionPane.showMessageDialog(dlgRegistrasi, "Email tidak valid!");
+                return;
+            }
+
+            // Validasi no telepon (minimal 10 karakter)
+            if (noTelepon.length() < 10) {
+                JOptionPane.showMessageDialog(dlgRegistrasi, "No. Telepon minimal 10 karakter!");
+                return;
+            }
+
+            // Proses registrasi
+            Member newMember = lib.daftarAnggota(nama, email, noTelepon, batas);
+
+            if (newMember != null) {
+                JOptionPane.showMessageDialog(dlgRegistrasi, 
+                    "Registrasi berhasil!\nID Member: " + newMember.getId() + 
+                    "\nSelamat datang, " + newMember.getNama() + "!");
+                result[0] = newMember;
+                dlgRegistrasi.dispose();
+            } else {
+                JOptionPane.showMessageDialog(dlgRegistrasi, 
+                    "Registrasi gagal!\nMungkin email sudah terdaftar atau ada error database.", 
+                    "Error", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+
+        // Logic Batal
+        btnBatal.addActionListener(e -> dlgRegistrasi.dispose());
+
+        dlgRegistrasi.setVisible(true);
+        return result[0];
     }
 
     // ============================================================
