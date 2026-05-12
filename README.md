@@ -89,7 +89,7 @@ This project serves as a **complete library management solution** that bridges t
 
 ---
 
-## 🏗️ System Architecture
+##  System Architecture
 
 ### Architecture Diagram
 ```
