@@ -2,7 +2,7 @@
 
 ##  Project Overview
 
-### What is This Project?
+### This is group project
 
 **Library Management System** is a Java-based desktop application designed to manage the operations of a library, including book cataloging, member registration, and book circulation (borrowing and returning). The system provides a comprehensive solution for librarians to manage their collection and track member borrowing activities.
 
